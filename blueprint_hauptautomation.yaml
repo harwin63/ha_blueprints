@@ -1,10 +1,18 @@
+# ===========================================================================
+# BLUEPRINT: Schlafzimmer Beleuchtung mit Nachtmodus (flexibel)
+# ===========================================================================
+# Voraussetzung: Die Helfer aus "helfer.yaml" müssen vorher erstellt werden.
+# ===========================================================================
+
 blueprint:
-  name: Schlafzimmer Beleuchtung mit Nachtmodus
+  name: Schlafzimmer Beleuchtung mit Nachtmodus (flexibel)
   description: >
     Steuerung der Schlafzimmer-Beleuchtung über einen Bewegungsmelder.
     Tagsüber leuchtet das Licht hell, morgens und abends gedimmt.
-    Ein manueller Nachtmodus verhindert, dass das Licht nachts angeht –
-    ideal für unregelmäßige Schlafzeiten am Wochenende.
+    Ein manueller Nachtmodus verhindert, dass das Licht nachts angeht.
+    Die Zeitgrenzen können entweder als feste Uhrzeiten oder über
+    Sonnenauf-/Untergang mit freiem Offset konfiguriert werden –
+    beides über Helfer im HA-Dashboard änderbar ohne YAML-Anpassung.
   domain: automation
   input:
     bewegungsmelder:
@@ -13,7 +21,7 @@ blueprint:
       selector:
         entity:
           domain: binary_sensor
-          device_class: 
+          device_class:
             - motion
             - occupancy
 
@@ -26,14 +34,47 @@ blueprint:
 
     nachtmodus_toggle:
       name: Nachtmodus-Toggle
-      description: >
-        Ein input_boolean oder ein Switch, der den Nachtmodus aktiviert.
-        Erstelle vorher einen input_boolean, z. B. "input_boolean.nachtmodus_schlafzimmer".
+      description: Der input_boolean für den Nachtmodus (aus helfer.yaml).
       selector:
         entity:
-          domain:
-            - input_boolean
-            - switch
+          domain: input_boolean
+
+    zeitsteuerung_modus:
+      name: Zeitsteuerung Modus
+      description: >
+        Der input_select für den Modus: "Uhrzeit" oder "Sonnen-Event"
+        (aus helfer.yaml).
+      selector:
+        entity:
+          domain: input_select
+
+    morgen_ende_uhrzeit:
+      name: Morgen Ende (Uhrzeit-Helfer)
+      description: Der input_datetime für die Morgen-Ende-Uhrzeit.
+      selector:
+        entity:
+          domain: input_datetime
+
+    morgen_ende_offset:
+      name: Morgen Ende (Offset-Helfer)
+      description: Der input_number für den Offset in Minuten (Morgen Ende).
+      selector:
+        entity:
+          domain: input_number
+
+    abend_start_uhrzeit:
+      name: Abend Start (Uhrzeit-Helfer)
+      description: Der input_datetime für die Abend-Start-Uhrzeit.
+      selector:
+        entity:
+          domain: input_datetime
+
+    abend_start_offset:
+      name: Abend Start (Offset-Helfer)
+      description: Der input_number für den Offset in Minuten (Abend Start).
+      selector:
+        entity:
+          domain: input_number
 
     helligkeit_tag:
       name: Helligkeit Tagsüber
@@ -55,13 +96,6 @@ blueprint:
           max: 100
           unit_of_measurement: "%"
 
-    # HINWEIS ZU UHRZEITEN:
-    # Die Morgen- und Abend-Uhrzeiten (Standard: 07:30 / 21:00) sind weiter unten
-    # in den Template-Bedingungen direkt eingetragen. Passe dort die Zeiten
-    # an, wenn du andere Werte wünschst. (Jinja2-Templates unterstützen kein !input.)
-    # Die Auto-Ausschalt-Zeit für den Nachtmodus (Standard: 09:00) ist in der
-    # zweiten Automation (Automation 2) ebenfalls direkt eingetragen.
-
     ausschalt_wartezeit:
       name: Ausschalt-Wartezeit nach letzter Bewegung
       description: >
@@ -74,29 +108,45 @@ blueprint:
           unit_of_measurement: "s"
 
 # ---------------------------------------------------------------------------
-# AUTOMATION 1: Bewegung erkannt → Licht einschalten (mit Helligkeit)
+# TRIGGER: Bewegung erkannt
 # ---------------------------------------------------------------------------
 trigger:
   - platform: state
     entity_id: !input bewegungsmelder
     to: "on"
 
+# ---------------------------------------------------------------------------
+# BEDINGUNG: Nachtmodus muss NICHT aktiv sein
+# ---------------------------------------------------------------------------
 condition:
-  # Nachtmodus muss NICHT aktiv sein
   - condition: state
     entity_id: !input nachtmodus_toggle
     state: "off"
 
+# ---------------------------------------------------------------------------
+# AKTION: Helligkeit anhand der Zeitphase bestimmen
+# ---------------------------------------------------------------------------
+# Wie funktioniert die Zeitlogik?
+#   - Wenn Modus = "Uhrzeit": Direkt die Uhrzeiten aus den input_datetime-Helpern verwenden.
+#   - Wenn Modus = "Sonnen-Event": Das Sonnen-Event (states.sun) + Offset berechnen.
+#   - Das Template gibt jeweils True/False zurück, ob wir in der Morgen- bzw. Abend-Phase sind.
+# ---------------------------------------------------------------------------
 action:
-  # Helligkeit anhand der Uhrzeit bestimmen
-  # HINWEIS: !input kann innerhalb von Jinja2-Templates nicht verwendet werden.
-  # Daher werden die Uhrzeiten hier direkt eingefügt – passe sie an, wenn du
-  # die Standardwerte im Blueprint-Input geändert hast.
   - choose:
-      # MORGEN: vor 07:30 Uhr (= uhrzeit_morgen_ende)
+      # MORGEN-PHASE: vor der Morgen-Ende-Zeit
       - conditions:
           - condition: template
-            value_template: "{{ now().strftime('%H:%M') < '07:30' }}"
+            value_template: >
+              {%- set modus = states(!input zeitsteuerung_modus) -%}
+              {%- if modus == 'Uhrzeit' -%}
+                {%- set morgen_ende = states(!input morgen_ende_uhrzeit) -%}
+                {{ now().strftime('%H:%M') < morgen_ende }}
+              {%- else -%}
+                {%- set offset_min = states(!input morgen_ende_offset) | float(0) -%}
+                {%- set sonnenaufgang = states.sun.rising | as_timestamp -%}
+                {%- set morgen_ende = (sonnenaufgang + (offset_min * 60)) | as_datetime -%}
+                {{ now() < morgen_ende }}
+              {%- endif -%}
         sequence:
           - service: light.turn_on
             target:
@@ -105,10 +155,20 @@ action:
               brightness_pct: !input helligkeit_abend_morgen
               transition: 2
 
-      # ABEND: ab 21:00 Uhr (= uhrzeit_abend_start)
+      # ABEND-PHASE: ab der Abend-Start-Zeit
       - conditions:
           - condition: template
-            value_template: "{{ now().strftime('%H:%M') >= '21:00' }}"
+            value_template: >
+              {%- set modus = states(!input zeitsteuerung_modus) -%}
+              {%- if modus == 'Uhrzeit' -%}
+                {%- set abend_start = states(!input abend_start_uhrzeit) -%}
+                {{ now().strftime('%H:%M') >= abend_start }}
+              {%- else -%}
+                {%- set offset_min = states(!input abend_start_offset) | float(0) -%}
+                {%- set sonnenuntergang = states.sun.setting | as_timestamp -%}
+                {%- set abend_start = (sonnenuntergang + (offset_min * 60)) | as_datetime -%}
+                {{ now() >= abend_start }}
+              {%- endif -%}
         sequence:
           - service: light.turn_on
             target:
@@ -117,7 +177,7 @@ action:
               brightness_pct: !input helligkeit_abend_morgen
               transition: 2
 
-    # STANDARD (Tagsüber): zwischen 07:30 und 21:00 Uhr
+    # STANDARD (Tagsüber): zwischen Morgen-Ende und Abend-Start
     default:
       - service: light.turn_on
         target:
@@ -126,7 +186,9 @@ action:
           brightness_pct: !input helligkeit_tag
           transition: 1
 
+  # ---------------------------------------------------------------------------
   # Licht nach Inaktivität wieder ausschalten
+  # ---------------------------------------------------------------------------
   - wait_for_trigger:
       - platform: state
         entity_id: !input bewegungsmelder
@@ -141,4 +203,3 @@ action:
       entity_id: !input licht
     data:
       transition: 2
-
