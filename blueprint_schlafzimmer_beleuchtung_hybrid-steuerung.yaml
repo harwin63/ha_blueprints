@@ -1,16 +1,14 @@
 blueprint:
-  name: Schlafzimmer Beleuchtung (Hybrid-Steuerung)
-  description: "Steuert Licht über Bewegung mit Adaptive Lighting. Erlaubt sowohl feste Werte als auch Helfer-Entitäten. Ist ein helfer eingetragen, hat dieser Vorrang."
+  name: Schlafzimmer Beleuchtung (Hybrid & Adaptive)
+  description: "Steuert Licht über Bewegung/Präsenz. Nutzt Adaptive Lighting & Nachtmodus-Check."
   domain: automation
   input:
     bewegungsmelder:
-      name: Bewegungsmelder
+      name: Bewegungsmelder / Präsenzsensor
       selector:
         entity:
           domain: binary_sensor
-          device_class: 
-            - motion
-            - occupancy
+          device_class: [motion, occupancy] # Akzeptiert beide Typen
     licht:
       name: Licht
       selector:
@@ -18,7 +16,7 @@ blueprint:
           domain: light
     adaptive_sleep_switch:
       name: Adaptive Lighting Sleep Mode Schalter
-      description: "Entität 'switch.adaptive_lighting_sleep_mode_...'"
+      description: "Die Entität 'switch.adaptive_lighting_sleep_mode_...'"
       selector:
         entity:
           domain: switch
@@ -72,15 +70,13 @@ blueprint:
           domain: input_number
 
 variables:
-  # Import der Inputs für Templates
   m_ende_f: !input morgen_ende_uhrzeit_fest
   m_ende_h: !input morgen_ende_uhrzeit_helfer
   a_start_f: !input abend_start_uhrzeit_fest
   a_start_h: !input abend_start_uhrzeit_helfer
   w_fest: !input ausschalt_wartezeit_fest
   w_helfer: !input ausschalt_wartezeit_helfer
-
-  # Entscheidungs-Logik: Helfer vor Festwert
+  # Zeit-Logik
   morgen_ende: "{{ states(m_ende_h) if m_ende_h != [] else m_ende_f }}"
   abend_start: "{{ states(a_start_h) if a_start_h != [] else a_start_f }}"
   wartezeit: "{{ states(w_helfer) | int if w_helfer != [] else w_fest | int }}"
@@ -88,6 +84,7 @@ variables:
 trigger:
   - platform: state
     entity_id: !input bewegungsmelder
+    from: "off"
     to: "on"
 
 condition:
@@ -97,13 +94,13 @@ condition:
 
 action:
   - choose:
-      # PRÜFUNG: Soll gedimmt werden? (Morgen oder Abend)
+      # GEDIMMT (Morgen oder Abend)
       - conditions:
           - condition: or
             conditions:
-              - condition: template # Morgen
+              - condition: template
                 value_template: "{{ now().strftime('%H:%M:%S') < morgen_ende }}"
-              - condition: template # Abend
+              - condition: template
                 value_template: "{{ now().strftime('%H:%M:%S') >= abend_start }}"
         sequence:
           - service: switch.turn_on
@@ -115,7 +112,7 @@ action:
             data:
               transition: 2
 
-    # DEFAULT: TAGSÜBER
+    # TAGSÜBER (Hell)
     default:
       - service: switch.turn_off
         target:
@@ -126,10 +123,11 @@ action:
         data:
           transition: 1
 
-  # Ausschalt-Logik
+  # Warten bis Bewegung dauerhaft weg ist
   - wait_for_trigger:
       - platform: state
         entity_id: !input bewegungsmelder
+        from: "on"
         to: "off"
         for:
           seconds: "{{ wartezeit }}"
