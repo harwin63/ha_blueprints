@@ -1,42 +1,44 @@
 # ===========================================================================
-# BLUEPRINT: Nachtmodus Auto-Ausschalt
+# BLUEPRINT: Nachtmodus Auto-Ausschaltung an Werktagen
 # ===========================================================================
-# Voraussetzung: Die Helfer aus "helfer.yaml" müssen vorher erstellt werden.
+# 
 # ===========================================================================
 
 blueprint:
-  name: Nachtmodus Auto-Ausschalt
+  name: Nachtmodus Auto-Ausschalt (Werktag)
   description: >
-    Schaltet den Nachtmodus jeden Morgen automatisch wieder aus,
-    damit er nicht "vergessen" bleibt. Die Uhrzeit wird über einen
-    Helfer im Dashboard steuerbar gemacht.
+    Schaltet den Nachtmodus an Werktagen zu einer festen Zeit aus.
   domain: automation
   input:
     nachtmodus_toggle:
       name: Nachtmodus-Toggle
-      description: Der input_boolean für den Nachtmodus (aus helfer.yaml).
       selector:
         entity:
           domain: input_boolean
-
-    nachtmodus_ausschalt_uhrzeit:
-      name: Nachtmodus Ausschalt-Uhrzeit (Helfer)
-      description: >
-        Der input_datetime-Helfer für die Ausschalt-Uhrzeit (aus helfer.yaml).
+    
+    workday_sensor:
+      name: Arbeitstag-Sensor
       selector:
         entity:
-          domain: input_datetime
+          domain: binary_sensor
+    
+    ausschalt_zeit:
+      name: Ausschalt-Zeit (Werktag)
+      default: "06:20:00"
+      selector:
+        time: {}
 
 trigger:
-  - platform: template
-    value_template: >
-      {{ now().strftime('%H:%M') == states('input_datetime.schlafzimmer_nachtmodus_ausschalt_uhrzeit') }}
-    for:
-      seconds: 0
+  - platform: time
+    at: !input ausschalt_zeit
 
 condition:
   - condition: state
     entity_id: !input nachtmodus_toggle
+    state: "on"
+  
+  - condition: state
+    entity_id: !input workday_sensor
     state: "on"
 
 action:
