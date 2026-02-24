@@ -12,7 +12,6 @@ Einsetzbar für: Fahrradakku, E-Scooter, E-Bike, Laptop, Werkzeugakku, ...
 
 - Smartplug mit **Leistungsmessung (Watt)** und **Energiemessung (kWh)**  
   Beispiele: Shelly Plug S, TP-Link Kasa, Nous A1T, IKEA Tradfri Outlet
-- Home Assistant mit Workday-Integration (optional)
 
 ---
 
@@ -42,6 +41,52 @@ Einsetzbar für: Fahrradakku, E-Scooter, E-Bike, Laptop, Werkzeugakku, ...
 | 3 | `Fahrradakku Kosten EUR` | `€` | `0` | `999` | `0.001` |
 
 > 💡 Für jedes weitere Gerät (E-Scooter, Laptop, ...) einfach drei neue Helfer mit passendem Namen anlegen und eine weitere Blueprint-Instanz erstellen.
+
+### Schritt 3 – Template-Helfer für Live-Anzeige (pro Gerät)
+
+Diese Helfer berechnen während des Ladens in Echtzeit Verbrauch und Kosten und werden von der Lovelace-Karte benötigt. Anlegen über die UI – kein Bearbeiten der `configuration.yaml` nötig.
+
+**Einstellungen → Geräte & Dienste → Helfer → Helfer erstellen → Template → Template für einen Sensor**
+
+**Template-Helfer 1 – Aktueller Verbrauch (kWh)**
+
+| Feld | Wert |
+|---|---|
+| Name | `Fahrradakku Aktueller Verbrauch kWh` |
+| Einheit | `kWh` |
+| Gerätetyp | `Energie` |
+| Zustandsklasse | `Summenwert` |
+| Icon | `mdi:lightning-bolt` |
+| Zustandsvorlage | siehe unten |
+
+```jinja
+{% set aktuell = states('sensor.DEIN_ENERGIEZAEHLER_SENSOR') | float(0) %}
+{% set start   = states('input_number.fahrradakku_ladestart_intern') | float(0) %}
+{% if start > 0 %}
+  {{ [aktuell - start, 0] | max | round(3) }}
+{% else %}
+  0
+{% endif %}
+```
+
+**Template-Helfer 2 – Aktuelle Kosten (€)**
+
+| Feld | Wert |
+|---|---|
+| Name | `Fahrradakku Aktueller Verbrauch EUR` |
+| Einheit | `€` |
+| Gerätetyp | `Monetär` |
+| Zustandsklasse | `Summenwert` |
+| Icon | `mdi:currency-eur` |
+| Zustandsvorlage | siehe unten |
+
+```jinja
+{% set kwh   = states('sensor.fahrradakku_aktueller_verbrauch_kwh') | float(0) %}
+{% set preis = states('input_number.strompreis_pro_kwh') | float(0.32) %}
+{{ (kwh * preis) | round(3) }}
+```
+
+> 💡 Die Entitäts-IDs `sensor.DEIN_ENERGIEZAEHLER_SENSOR` und `input_number.fahrradakku_ladestart_intern` an dein Gerät anpassen. Der zweite Template-Helfer referenziert den ersten – daher zuerst Helfer 1 anlegen!
 
 ---
 
