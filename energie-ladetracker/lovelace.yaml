@@ -1,0 +1,55 @@
+# ===========================================================================
+# LOVELACE BEISPIELKARTE – Energie-Ladetracker
+# ===========================================================================
+# Einfügen über:
+#   Dashboard → Bearbeiten → Karte hinzufügen → YAML manuell eingeben
+#
+# ANPASSEN: Alle Stellen mit "DEIN_GERAET" durch deinen Helfernamen ersetzen
+# Beispiel:
+#   input_number.DEIN_GERAET_ladestart_intern
+#   → input_number.fahrradakku_ladestart_intern
+# ===========================================================================
+
+type: vertical-stack
+cards:
+
+  - type: markdown
+    content: >
+      ## 🔋 Energie-Ladetracker
+
+  - type: entities
+    title: "Aktueller Ladevorgang (live)"
+    entities:
+      - entity: sensor.DEIN_GERAET_aktueller_verbrauch_kwh
+        name: "Verbrauch (laufend)"
+        icon: mdi:lightning-bolt
+      - entity: sensor.DEIN_GERAET_aktueller_verbrauch_eur
+        name: "Kosten (laufend)"
+        icon: mdi:currency-eur
+
+  - type: entities
+    title: "Letzter abgeschlossener Ladevorgang"
+    entities:
+      - entity: input_number.DEIN_GERAET_verbrauch_kwh
+        name: "Verbrauch"
+        icon: mdi:lightning-bolt
+      - entity: input_number.DEIN_GERAET_kosten_eur
+        name: "Kosten"
+        icon: mdi:currency-eur
+
+  - type: entities
+    title: "Einstellungen"
+    entities:
+      - entity: input_number.strompreis_pro_kwh
+        name: "Strompreis"
+        icon: mdi:currency-eur
+
+  - type: button
+    name: "Ladetracker manuell zurücksetzen"
+    icon: mdi:restart
+    tap_action:
+      action: call-service
+      service: input_number.set_value
+      service_data:
+        entity_id: input_number.DEIN_GERAET_ladestart_intern
+        value: 0
