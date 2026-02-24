@@ -40,15 +40,19 @@ Einsetzbar für: Fahrradakku, E-Scooter, E-Bike, Laptop, Werkzeugakku, ...
 | 2 | `Fahrradakku Verbrauch kWh` | `kWh` | `0` | `999` | `0.001` |
 | 3 | `Fahrradakku Kosten EUR` | `€` | `0` | `999` | `0.001` |
 
+> 💡 Helfer 2 und 3 werden vom Blueprint nach dem Ladeende automatisch beschrieben. Die Anzeige in der Lovelace-Karte erfolgt über Template-Helfer 3 und 4 (Schritt 3) – kein manuelles Bearbeiten nötig oder vorgesehen.
+
 > 💡 Für jedes weitere Gerät (E-Scooter, Laptop, ...) einfach drei neue Helfer mit passendem Namen anlegen und eine weitere Blueprint-Instanz erstellen.
 
-### Schritt 3 – Template-Helfer für Live-Anzeige (pro Gerät)
-
-Diese Helfer berechnen während des Ladens in Echtzeit Verbrauch und Kosten und werden von der Lovelace-Karte benötigt. Anlegen über die UI – kein Bearbeiten der `configuration.yaml` nötig.
+### Schritt 3 – Template-Helfer (pro Gerät)
 
 **Einstellungen → Geräte & Dienste → Helfer → Helfer erstellen → Template → Template für einen Sensor**
 
-**Template-Helfer 1 – Aktueller Verbrauch (kWh)**
+Insgesamt vier Template-Helfer anlegen – zwei für die Live-Anzeige während des Ladens, zwei für die Anzeige des letzten abgeschlossenen Ladevorgangs.
+
+---
+
+**Template-Helfer 1 – Aktueller Verbrauch live (kWh)**
 
 | Feld | Wert |
 |---|---|
@@ -69,7 +73,9 @@ Diese Helfer berechnen während des Ladens in Echtzeit Verbrauch und Kosten und 
 {% endif %}
 ```
 
-**Template-Helfer 2 – Aktuelle Kosten (€)**
+---
+
+**Template-Helfer 2 – Aktuelle Kosten live (€)**
 
 | Feld | Wert |
 |---|---|
@@ -86,7 +92,44 @@ Diese Helfer berechnen während des Ladens in Echtzeit Verbrauch und Kosten und 
 {{ (kwh * preis) | round(3) }}
 ```
 
-> 💡 Die Entitäts-IDs `sensor.DEIN_ENERGIEZAEHLER_SENSOR` und `input_number.fahrradakku_ladestart_intern` an dein Gerät anpassen. Der zweite Template-Helfer referenziert den ersten – daher zuerst Helfer 1 anlegen!
+---
+
+**Template-Helfer 3 – Letzter Verbrauch Anzeige (kWh)**
+
+| Feld | Wert |
+|---|---|
+| Name | `Fahrradakku Verbrauch kWh Anzeige` |
+| Einheit | `kWh` |
+| Gerätetyp | `Energie` |
+| Zustandsklasse | `Summenwert` |
+| Icon | `mdi:lightning-bolt` |
+| Zustandsvorlage | siehe unten |
+
+```jinja
+{{ states('input_number.fahrradakku_verbrauch_kwh') | float(0) | round(3) }}
+```
+
+---
+
+**Template-Helfer 4 – Letzte Kosten Anzeige (€)**
+
+| Feld | Wert |
+|---|---|
+| Name | `Fahrradakku Kosten EUR Anzeige` |
+| Einheit | `€` |
+| Gerätetyp | `Monetär` |
+| Zustandsklasse | `Summenwert` |
+| Icon | `mdi:currency-eur` |
+| Zustandsvorlage | siehe unten |
+
+```jinja
+{{ states('input_number.fahrradakku_kosten_eur') | float(0) | round(3) }}
+```
+
+---
+
+> 💡 Template-Helfer 2 referenziert Helfer 1 – daher immer zuerst Helfer 1 anlegen!
+> 💡 Helfer 3 und 4 reichen die Werte der `input_number` nur durch und stellen sie als reine Anzeige dar – kein Eingabefeld in der Lovelace-Karte.
 
 ---
 
