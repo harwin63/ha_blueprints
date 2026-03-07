@@ -49,7 +49,6 @@ cards:
       - entity: switch.DEIN_SMARTPLUG_SCHALTER
         name: "Steckdose Fahrradakku"
         icon: mdi:power-socket-de
-        icon: mdi:currency-eur
 
   - type: button
     name: "Ladetracker manuell zurücksetzen"
