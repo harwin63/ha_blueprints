@@ -43,19 +43,19 @@ cards:
       - entity: input_number.strompreis_pro_kwh
         name: "Strompreis"
 
-  - type: entities
-    title: "Steckdose"
-    entities:
-      - entity: switch.DEIN_SMARTPLUG_SCHALTER
-        name: "Steckdose Fahrradakku"
-        icon: mdi:power-socket-de
-
-  - type: button
-    name: "Ladetracker manuell zurücksetzen"
-    icon: mdi:restart
-    tap_action:
-      action: call-service
-      service: input_number.set_value
-      service_data:
-        entity_id: input_number.DEIN_GERAET_ladestart_intern
-        value: 0
+  - type: horizontal-stack
+    cards:
+      - show_name: true
+        show_icon: true
+        type: button
+        entity: sswitch.DEIN_SMARTPLUG_SCHALTER
+      - type: button
+        name: Ladetracker manuell zurücksetzen
+        icon: mdi:restart
+        tap_action:
+          action: call-service
+          service: input_number.set_value
+          service_data:
+            entity_id: input_number.DEIN_GERAET_ladestart_intern
+            value: 0
+  
